@@ -5,7 +5,6 @@ const COREADDRESS = "localhost:49500";
 var messages = require('./intrigue_pb');
 var services = require('./intrigue_grpc_pb');
 var grpc = require('grpc');
-const logger = require('node-color-log');
 
 var client: gmbh;
 
@@ -552,7 +551,7 @@ function getClient(): gmbh | null {
 // log messages in a standardized way
 function log(msg: any){
     let tag = name == undefined ? "gmbh" : name;
-    logger.color('magenta').log("["+ timeStamp() + "] ["+tag+"] " + msg);
+    console.log("["+ timeStamp() + "] ["+tag+"] " + msg);
 }
 
 function timeStamp(): string {

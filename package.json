@@ -1,0 +1,28 @@
+{
+  "name": "gmbh",
+  "version": "0.10.0",
+  "description": "gmbh nodejs client",
+  "main": "gmbh.js",
+  "dependencies": {
+    "google-protobuf": "^3.7.1",
+    "grpc": "^1.19.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gmbh-micro/gmbh-node.git"
+  },
+  "keywords": [
+    "gmbh",
+    "server-clinet"
+  ],
+  "author": "Abarahm Dick",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/gmbh-micro/gmbh-node/issues"
+  },
+  "homepage": "https://github.com/gmbh-micro/gmbh-node#readme"
+}

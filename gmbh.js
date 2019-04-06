@@ -39,7 +39,6 @@ var COREADDRESS = "localhost:49500";
 var messages = require('./intrigue_pb');
 var services = require('./intrigue_grpc_pb');
 var grpc = require('grpc');
-var logger = require('node-color-log');
 var client;
 // @ts-ignore
 var name;
@@ -516,7 +515,7 @@ function getClient() {
 // log messages in a standardized way
 function log(msg) {
     var tag = name == undefined ? "gmbh" : name;
-    logger.color('magenta').log("[" + timeStamp() + "] [" + tag + "] " + msg);
+    console.log("[" + timeStamp() + "] [" + tag + "] " + msg);
 }
 function timeStamp() {
     var d = new Date();
