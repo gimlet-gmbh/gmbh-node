@@ -22,6 +22,7 @@ class gmbh {
     state: string;
     msgCnt: number;
     errors: [string];
+    parentID: string
     warnings: [string];
     env: string;
     closed: boolean;
@@ -35,6 +36,7 @@ class gmbh {
         this.state = "DISCONNECTED";
         this.msgCnt = 0;
         this.errors = [""];
+        this.parentID = process.env.REMOTE != undefined ? process.env.REMOTE : "";
         this.warnings = [""];
         this.env = process.env.ENV != undefined ? process.env.ENV : "";
         this.closed = false;
@@ -467,6 +469,7 @@ class cabal {
         service.setAddress(g.reg.address);
         service.setMode(g.env);
         service.setPeergroupsList(g.opts.service.peerGroups);
+        service.setParentid(g.parentID);
         service.setErrorsList([""]);
 
         log(service)
