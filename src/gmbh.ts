@@ -1,4 +1,3 @@
-import { AnyARecord } from "dns";
 
 const version = "0.10.0";
 const COREADDRESS = "localhost:49500";
@@ -6,8 +5,12 @@ const COREADDRESS = "localhost:49500";
 var messages = require('./intrigue_pb');
 var services = require('./intrigue_grpc_pb');
 var grpc = require('grpc');
+const logger = require('node-color-log');
 
 var client: gmbh;
+
+// @ts-ignore
+var name: string;
 
 class gmbh {
     reg: registration | null;
@@ -16,7 +19,7 @@ class gmbh {
     registeredFunctions: any;
     messages: any;
     pongTime: string
-    whoIs: Object;
+    whoIs: any;
     state: string;
     msgCnt: number;
     errors: [string];
@@ -40,29 +43,134 @@ class gmbh {
         client = this;
     }
 
-    Start(){
-        log("                    _                 ")
-        log("  _  ._ _  |_  |_| /  | o  _  ._ _|_  ")
-        log(" (_| | | | |_) | | \\_ | | (/_ | | |_ ")
-        log("  _|                                  ")
-        log(`version=${version}; env=${this.env}`);
+    Start(): Promise<boolean>{
+        return new Promise<boolean>((resolve, reject)=>{
 
-        this._connect();
+            log("                    _                 ")
+            log("  _  ._ _  |_  |_| /  | o  _  ._ _|_  ")
+            log(" (_| | | | |_) | | \\_ | | (/_ | | |_ ")
+            log("  _|                                  ")
+            log(`version=${version}; env=${this.env}`);
+    
+            // @ts-ignore
+            name = this.opts.service.name;
+            this._connect();
+    
+            if(this.env == "M"){
+                log("managed mode; ignoring sigint; listening for sigusr2");
+                process.on('SIGINT', ()=>{});
+                process.on('SIGUSR2', gmbh._shutdown);
+            } else {
+                process.on('SIGINT', gmbh._shutdown);
+            }
+                
+            resolve(true);
+        });
     }
 
     Route(route: string, handler: Function) {
         this.registeredFunctions[route] = handler;
     }
 
-    MakeRequest(target: string, method:string, data:any): any {
-
+    async MakeRequest(target: string, method:string, data:payload): Promise<payload> {
+        return new Promise<payload>((resolve, reject)=>{
+            this._dataRequest(target, method, data)
+                .then((responder: any)=>{
+                    resolve(payload.fromProto(responder.getPload()));
+                }).catch((err: string)=>{
+                    reject(new payload());
+                });
+        });
     }
 
-    NewPayload(){
-        return new payload();
+    NewPayload(){ 
+        return new payload(); 
     }
 
-    _connect(){
+    async _dataRequest(target: string, method: string, data: payload): Promise<any>{
+        return new Promise<any>((resolve, reject)=>{
+            let g  = getClient();
+            if(g == null) { 
+                reject("refError");
+                return; 
+            }
+
+            g._resolveAddress(target)
+                .then((value: string)=>{
+                    let t = Date.now();
+
+                    let client = new services.CabalClient(this.opts.standalone.coreAddress, grpc.credentials.createInsecure()); 
+                    let msg = new messages.DataRequest();
+
+
+                    let tport = new messages.Transport();
+                    tport.setTarget(target);
+                    tport.setMethod(method);
+                    tport.setSender(this.opts.service.name);
+
+                    let request = new messages.Request();
+                    request.setTport(tport);
+                    request.setPload(data.toProto());
+
+                    msg.setRequest(request);
+
+                    this.msgCnt++;
+                    if(this.env != "C" || process.env.LOGGING == "1"){
+                        log("<=" + this.msgCnt + "= target: " + target + ", method: " + method);
+                    }
+
+                    client.data(msg, (err: any, reply: any)=>{
+
+                        if(err != null){
+                            console.log(err);
+                            reject("core.error" + err);
+                            return new payload();
+                        }
+
+                        if(this.env != "C" || process.env.LOGGING == "1"){
+                            let tn: any = new Date();
+                            tn = tn - t;
+                            log(" =" + this.msgCnt + "=> " + "time=" + tn);
+                        }
+
+                        if(reply.getResponder() == null){
+                            log("error")
+                            console.log(reply);
+                            reject("getResponder.error");
+                            return;
+                        }
+
+                        resolve(reply.getResponder());
+                    });
+                });
+        });
+    }
+
+    _resolveAddress(target: string): Promise<string> {
+        return new Promise<string>((resolve, reject)=>{
+
+            if(this.whoIs[target] != undefined){
+                resolve(this.whoIs[target]);
+            }
+            
+            log("getting address for " + target);
+
+            if(this.reg == null){
+                reject("refError");
+                return;
+            }
+            request.whoIs(target, this.opts.service.name, this.reg.fingerprint, this.opts.standalone.coreAddress)
+                .then((value: string)=>{
+                    // go directly to the taget service
+                    resolve(value);
+                }).catch((err: any)=>{
+                    // go through the core
+                    resolve(this.opts.standalone.coreAddress)
+                });    
+        });
+    }
+
+    async _connect(){
         log("attempting to connect to coreData");
 
         if(this.state == "CONNECTED"){
@@ -70,40 +178,23 @@ class gmbh {
             return;
         }
 
-        this._register()
-            .then( (value: registration) => {
-                this.reg = value;
+        this.reg = await this._register();
 
-                log("registration details");
-                log("id=" + this.reg.id + "; address=" + this.reg.address + "; fingerprint=" + this.reg.fingerprint)
+        log("registration details");
+        log("id=" + this.reg.id + "; address=" + this.reg.address + "; fingerprint=" + this.reg.fingerprint)
 
-                if(this.reg.address == ""){
-                    log("address not received");
-                    return;
-                }
+        if(this.reg.address == ""){
+            log("address not received");
+            return;
+        }
 
-                this.con.address = this.reg.address;
-                this.state = "CONNECTED";
+        this.con.address = this.reg.address;
+        this.state = "CONNECTED";
 
-                // connect
-                this.con.connect()
-                    .then((value: string)=>{
-
-                        console.log(value);
-
-                    }).catch( (err:any)=>{
-
-                        console.log(err);
-
-                    });
-            })
-            .catch( (err: any) => {
-                console.log(err); 
-            });
-
+        await this.con.connect();
     }
 
-    async _register(): Promise<registration> {
+    _register(): Promise<registration> {
         return new Promise<registration>( (resolve,reject)=>{
             let send = ()=>{
                 let client = new services.CabalClient(this.opts.standalone.coreAddress, grpc.credentials.createInsecure()); 
@@ -122,7 +213,6 @@ class gmbh {
 
                 client.registerService(request, (err: object, resp: any) => {
                     if(err == null){
-                        console.log("recieved response");
                         if(resp.getMessage() == "acknowledged"){
                             let serviceInfo = resp.getServiceinfo();
                             let r = new registration()
@@ -140,6 +230,36 @@ class gmbh {
                 });
             }
             send();
+        });
+    }
+
+    _unregister(addr: string, name: string): Promise<boolean> {
+        return new Promise<boolean>( (resolve, reject)=>{
+            let client = new services.CabalClient(addr, grpc.credentials.createInsecure()); 
+            let request = new messages.ServiceUpdate();
+            request.setRequest("shutdown.notif");
+            request.setMessage(name);
+            client.updateRegistration(request, (err: object, resp: any)=>{
+                resolve(true);
+            });
+        });
+    }
+
+    static _shutdown(){
+        let g = getClient();
+        if(g == null){
+            log("refError");
+            return;
+        }
+        console.log(); // deadline to align output
+
+        g.closed = true;
+        g._unregister(g.opts.standalone.coreAddress, g.opts.service.name).then(()=>{
+            if(g != null){
+                g.con.disconnect();
+            }
+            log("shutdown complete");
+            process.exit(0);
         });
     }
 }
@@ -191,7 +311,7 @@ class serviceOptions{
     aliases: [string];
     peerGroups: [string]
     constructor(){
-        this.name = "service";
+        this.name = "";
         this.aliases = [""];
         this.peerGroups = ["universal"];
     }
@@ -369,6 +489,41 @@ class cabal {
     }
 }
 
+
+/*
+ * request
+ *
+ * Contains all static functions needed to make requests to core
+ */
+class request {
+    static whoIs(target:string, name:string, fingerprint: string, address: string): Promise<string> {
+        return new Promise<string>((resolve, reject)=>{
+            let client = new services.CabalClient(address, grpc.credentials.createInsecure()); 
+            let request = new messages.WhoIsRequest();
+            request.setTarget(target);
+            request.setSender(name);
+
+            let meta = new grpc.Metadata();
+            meta.add("sender", name);
+            meta.add("target", "core");
+            meta.add("fingerprint", fingerprint);
+
+            client.WhoIs(request, meta, (err: any, reply:any)=>{
+                if(err != null){ reject(""); }
+
+                let e = reply.getError();
+                if(e != ""){ reject(e); }
+
+                resolve(reply.getTargetaddress());
+            });
+        });
+    }
+
+    static Data(){}
+    static Register(){}
+}
+
+
 // handleDataRequest attempts to resolve the registered function with the client to send the 
 // payload to for processing.
 function handleDataRequest(tport: any, pload: any): any{
@@ -396,8 +551,13 @@ function getClient(): gmbh | null {
 
 // log messages in a standardized way
 function log(msg: any){
-    console.log(msg);
-    // console.log("[time] [gmbh] "+msg);
+    let tag = name == undefined ? "gmbh" : name;
+    logger.color('magenta').log("["+ timeStamp() + "] ["+tag+"] " + msg);
+}
+
+function timeStamp(): string {
+    let d = new Date();
+    return d.getFullYear() + "/" + d.getMonth() + "/" + d.getDay() + " " + d.getHours() + ":" + d.getMinutes();
 }
 
 class payload{
@@ -504,7 +664,6 @@ class payload{
         }
     }
 }
-
 
 module.exports = {
     gmbh,

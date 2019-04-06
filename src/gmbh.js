@@ -34,13 +34,15 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-Object.defineProperty(exports, "__esModule", { value: true });
 var version = "0.10.0";
 var COREADDRESS = "localhost:49500";
 var messages = require('./intrigue_pb');
 var services = require('./intrigue_grpc_pb');
 var grpc = require('grpc');
+var logger = require('node-color-log');
 var client;
+// @ts-ignore
+var name;
 var gmbh = /** @class */ (function () {
     function gmbh(opts) {
         this.reg = new registration();
@@ -58,91 +60,213 @@ var gmbh = /** @class */ (function () {
         client = this;
     }
     gmbh.prototype.Start = function () {
-        log("                    _                 ");
-        log("  _  ._ _  |_  |_| /  | o  _  ._ _|_  ");
-        log(" (_| | | | |_) | | \\_ | | (/_ | | |_ ");
-        log("  _|                                  ");
-        log("version=" + version + "; env=" + this.env);
-        this._connect();
+        var _this = this;
+        return new Promise(function (resolve, reject) {
+            log("                    _                 ");
+            log("  _  ._ _  |_  |_| /  | o  _  ._ _|_  ");
+            log(" (_| | | | |_) | | \\_ | | (/_ | | |_ ");
+            log("  _|                                  ");
+            log("version=" + version + "; env=" + _this.env);
+            // @ts-ignore
+            name = _this.opts.service.name;
+            _this._connect();
+            if (_this.env == "M") {
+                log("managed mode; ignoring sigint; listening for sigusr2");
+                process.on('SIGINT', function () { });
+                process.on('SIGUSR2', gmbh._shutdown);
+            }
+            else {
+                process.on('SIGINT', gmbh._shutdown);
+            }
+            resolve(true);
+        });
     };
     gmbh.prototype.Route = function (route, handler) {
         this.registeredFunctions[route] = handler;
     };
     gmbh.prototype.MakeRequest = function (target, method, data) {
-    };
-    gmbh.prototype.NewPayload = function () {
-        return new payload();
-    };
-    gmbh.prototype._connect = function () {
-        var _this = this;
-        log("attempting to connect to coreData");
-        if (this.state == "CONNECTED") {
-            log("state reported as connected; returning");
-            return;
-        }
-        this._register()
-            .then(function (value) {
-            _this.reg = value;
-            log("registration details");
-            log("id=" + _this.reg.id + "; address=" + _this.reg.address + "; fingerprint=" + _this.reg.fingerprint);
-            if (_this.reg.address == "") {
-                log("address not received");
-                return;
-            }
-            _this.con.address = _this.reg.address;
-            _this.state = "CONNECTED";
-            // connect
-            _this.con.connect()
-                .then(function (value) {
-                console.log(value);
-            }).catch(function (err) {
-                console.log(err);
-            });
-        })
-            .catch(function (err) {
-            console.log(err);
-        });
-    };
-    gmbh.prototype._register = function () {
         return __awaiter(this, void 0, void 0, function () {
             var _this = this;
             return __generator(this, function (_a) {
                 return [2 /*return*/, new Promise(function (resolve, reject) {
-                        var send = function () {
-                            var client = new services.CabalClient(_this.opts.standalone.coreAddress, grpc.credentials.createInsecure());
-                            var request = new messages.NewServiceRequest();
-                            var service = new messages.NewService();
-                            service.setName(_this.opts.service.name);
-                            service.setAliasesList(_this.opts.service.aliases);
-                            service.setPeergroupsList(_this.opts.service.peerGroups);
-                            service.setIsclient(true);
-                            service.setIsserver(true);
-                            request.setService(service);
-                            request.setAddress("");
-                            request.setEnv(_this.env);
-                            client.registerService(request, function (err, resp) {
-                                if (err == null) {
-                                    console.log("recieved response");
-                                    if (resp.getMessage() == "acknowledged") {
-                                        var serviceInfo = resp.getServiceinfo();
-                                        var r = new registration();
-                                        r.id = serviceInfo.getId();
-                                        r.address = serviceInfo.getAddress();
-                                        r.fingerprint = serviceInfo.getFingerprint();
-                                        resolve(r);
-                                    }
-                                }
-                                else {
-                                    // TODO
-                                    // if(this.closed || ()){}
-                                    log("could not reach gmbh-core, trying again in 5 seconds");
-                                    setTimeout(send, 5000);
-                                }
-                            });
-                        };
-                        send();
+                        _this._dataRequest(target, method, data)
+                            .then(function (responder) {
+                            resolve(payload.fromProto(responder.getPload()));
+                        }).catch(function (err) {
+                            reject(new payload());
+                        });
                     })];
             });
+        });
+    };
+    gmbh.prototype.NewPayload = function () {
+        return new payload();
+    };
+    gmbh.prototype._dataRequest = function (target, method, data) {
+        return __awaiter(this, void 0, void 0, function () {
+            var _this = this;
+            return __generator(this, function (_a) {
+                return [2 /*return*/, new Promise(function (resolve, reject) {
+                        var g = getClient();
+                        if (g == null) {
+                            reject("refError");
+                            return;
+                        }
+                        g._resolveAddress(target)
+                            .then(function (value) {
+                            var t = Date.now();
+                            var client = new services.CabalClient(_this.opts.standalone.coreAddress, grpc.credentials.createInsecure());
+                            var msg = new messages.DataRequest();
+                            var tport = new messages.Transport();
+                            tport.setTarget(target);
+                            tport.setMethod(method);
+                            tport.setSender(_this.opts.service.name);
+                            var request = new messages.Request();
+                            request.setTport(tport);
+                            request.setPload(data.toProto());
+                            msg.setRequest(request);
+                            _this.msgCnt++;
+                            if (_this.env != "C" || process.env.LOGGING == "1") {
+                                log("<=" + _this.msgCnt + "= target: " + target + ", method: " + method);
+                            }
+                            client.data(msg, function (err, reply) {
+                                if (err != null) {
+                                    console.log(err);
+                                    reject("core.error" + err);
+                                    return new payload();
+                                }
+                                if (_this.env != "C" || process.env.LOGGING == "1") {
+                                    var tn = new Date();
+                                    tn = tn - t;
+                                    log(" =" + _this.msgCnt + "=> " + "time=" + tn);
+                                }
+                                if (reply.getResponder() == null) {
+                                    log("error");
+                                    console.log(reply);
+                                    reject("getResponder.error");
+                                    return;
+                                }
+                                resolve(reply.getResponder());
+                            });
+                        });
+                    })];
+            });
+        });
+    };
+    gmbh.prototype._resolveAddress = function (target) {
+        var _this = this;
+        return new Promise(function (resolve, reject) {
+            if (_this.whoIs[target] != undefined) {
+                resolve(_this.whoIs[target]);
+            }
+            log("getting address for " + target);
+            if (_this.reg == null) {
+                reject("refError");
+                return;
+            }
+            request.whoIs(target, _this.opts.service.name, _this.reg.fingerprint, _this.opts.standalone.coreAddress)
+                .then(function (value) {
+                // go directly to the taget service
+                resolve(value);
+            }).catch(function (err) {
+                // go through the core
+                resolve(_this.opts.standalone.coreAddress);
+            });
+        });
+    };
+    gmbh.prototype._connect = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var _a;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        log("attempting to connect to coreData");
+                        if (this.state == "CONNECTED") {
+                            log("state reported as connected; returning");
+                            return [2 /*return*/];
+                        }
+                        _a = this;
+                        return [4 /*yield*/, this._register()];
+                    case 1:
+                        _a.reg = _b.sent();
+                        log("registration details");
+                        log("id=" + this.reg.id + "; address=" + this.reg.address + "; fingerprint=" + this.reg.fingerprint);
+                        if (this.reg.address == "") {
+                            log("address not received");
+                            return [2 /*return*/];
+                        }
+                        this.con.address = this.reg.address;
+                        this.state = "CONNECTED";
+                        return [4 /*yield*/, this.con.connect()];
+                    case 2:
+                        _b.sent();
+                        return [2 /*return*/];
+                }
+            });
+        });
+    };
+    gmbh.prototype._register = function () {
+        var _this = this;
+        return new Promise(function (resolve, reject) {
+            var send = function () {
+                var client = new services.CabalClient(_this.opts.standalone.coreAddress, grpc.credentials.createInsecure());
+                var request = new messages.NewServiceRequest();
+                var service = new messages.NewService();
+                service.setName(_this.opts.service.name);
+                service.setAliasesList(_this.opts.service.aliases);
+                service.setPeergroupsList(_this.opts.service.peerGroups);
+                service.setIsclient(true);
+                service.setIsserver(true);
+                request.setService(service);
+                request.setAddress("");
+                request.setEnv(_this.env);
+                client.registerService(request, function (err, resp) {
+                    if (err == null) {
+                        if (resp.getMessage() == "acknowledged") {
+                            var serviceInfo = resp.getServiceinfo();
+                            var r = new registration();
+                            r.id = serviceInfo.getId();
+                            r.address = serviceInfo.getAddress();
+                            r.fingerprint = serviceInfo.getFingerprint();
+                            resolve(r);
+                        }
+                    }
+                    else {
+                        // TODO
+                        // if(this.closed || ()){}
+                        log("could not reach gmbh-core, trying again in 5 seconds");
+                        setTimeout(send, 5000);
+                    }
+                });
+            };
+            send();
+        });
+    };
+    gmbh.prototype._unregister = function (addr, name) {
+        return new Promise(function (resolve, reject) {
+            var client = new services.CabalClient(addr, grpc.credentials.createInsecure());
+            var request = new messages.ServiceUpdate();
+            request.setRequest("shutdown.notif");
+            request.setMessage(name);
+            client.updateRegistration(request, function (err, resp) {
+                resolve(true);
+            });
+        });
+    };
+    gmbh._shutdown = function () {
+        var g = getClient();
+        if (g == null) {
+            log("refError");
+            return;
+        }
+        console.log(); // deadline to align output
+        g.closed = true;
+        g._unregister(g.opts.standalone.coreAddress, g.opts.service.name).then(function () {
+            if (g != null) {
+                g.con.disconnect();
+            }
+            log("shutdown complete");
+            process.exit(0);
         });
     };
     return gmbh;
@@ -180,7 +304,7 @@ var standaloneOptions = /** @class */ (function () {
 }());
 var serviceOptions = /** @class */ (function () {
     function serviceOptions() {
-        this.name = "service";
+        this.name = "";
         this.aliases = [""];
         this.peerGroups = ["universal"];
     }
@@ -335,6 +459,40 @@ var cabal = /** @class */ (function () {
     };
     return cabal;
 }());
+/*
+ * request
+ *
+ * Contains all static functions needed to make requests to core
+ */
+var request = /** @class */ (function () {
+    function request() {
+    }
+    request.whoIs = function (target, name, fingerprint, address) {
+        return new Promise(function (resolve, reject) {
+            var client = new services.CabalClient(address, grpc.credentials.createInsecure());
+            var request = new messages.WhoIsRequest();
+            request.setTarget(target);
+            request.setSender(name);
+            var meta = new grpc.Metadata();
+            meta.add("sender", name);
+            meta.add("target", "core");
+            meta.add("fingerprint", fingerprint);
+            client.WhoIs(request, meta, function (err, reply) {
+                if (err != null) {
+                    reject("");
+                }
+                var e = reply.getError();
+                if (e != "") {
+                    reject(e);
+                }
+                resolve(reply.getTargetaddress());
+            });
+        });
+    };
+    request.Data = function () { };
+    request.Register = function () { };
+    return request;
+}());
 // handleDataRequest attempts to resolve the registered function with the client to send the 
 // payload to for processing.
 function handleDataRequest(tport, pload) {
@@ -357,8 +515,12 @@ function getClient() {
 }
 // log messages in a standardized way
 function log(msg) {
-    console.log(msg);
-    // console.log("[time] [gmbh] "+msg);
+    var tag = name == undefined ? "gmbh" : name;
+    logger.color('magenta').log("[" + timeStamp() + "] [" + tag + "] " + msg);
+}
+function timeStamp() {
+    var d = new Date();
+    return d.getFullYear() + "/" + d.getMonth() + "/" + d.getDay() + " " + d.getHours() + ":" + d.getMinutes();
 }
 var payload = /** @class */ (function () {
     function payload() {

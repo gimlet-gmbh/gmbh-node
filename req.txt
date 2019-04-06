@@ -1,3 +1,2 @@
 grpc https://www.npmjs.com/package/grpc
 google-protobuf https://www.npmjs.com/package/google-protobuf
-npm i protobufjs
