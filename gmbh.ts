@@ -439,6 +439,7 @@ class cabal {
         let unknownIDErr = (msg="")=>{
             let err = new messages.SummaryReceipt();
             err.setError("unknown.id."+msg);
+            log(err);
             callback(null, err);
         };
 
@@ -467,6 +468,8 @@ class cabal {
         service.setMode(g.env);
         service.setPeergroupsList(g.opts.service.peerGroups);
         service.setErrorsList([""]);
+
+        log(service)
 
         response.setServicesList([service]);
 

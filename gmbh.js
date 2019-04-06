@@ -418,6 +418,7 @@ var cabal = /** @class */ (function () {
             if (msg === void 0) { msg = ""; }
             var err = new messages.SummaryReceipt();
             err.setError("unknown.id." + msg);
+            log(err);
             callback(null, err);
         };
         var g = getClient();
@@ -441,6 +442,7 @@ var cabal = /** @class */ (function () {
         service.setMode(g.env);
         service.setPeergroupsList(g.opts.service.peerGroups);
         service.setErrorsList([""]);
+        log(service);
         response.setServicesList([service]);
         callback(null, response);
     };
