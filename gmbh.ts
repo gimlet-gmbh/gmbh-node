@@ -21,6 +21,7 @@ class gmbh {
     registeredFunctions: any;
     messages: any;
     pongTime: string
+    myAddress: string
     whoIs: any;
     state: string;
     msgCnt: number;
@@ -44,6 +45,7 @@ class gmbh {
 
         // unused
         this.pongTime = "";
+        this.myAddress = "";
 
         // whoIs map [name]address
         //
@@ -75,8 +77,8 @@ class gmbh {
         client = this;
     }
 
-    Start(): Promise<boolean>{
-        return new Promise<boolean>((resolve, reject)=>{
+    Start(): Promise<string>{
+        return new Promise<string>((resolve, reject)=>{
 
             log("                    _                 ")
             log("  _  ._ _  |_  |_| /  | o  _  ._ _|_  ")
@@ -97,8 +99,23 @@ class gmbh {
             } else {
                 process.on('SIGINT', gmbh._shutdown);
             }
-                
-            resolve(true);
+
+            // If the address back to core has been set using an environment variable, use that. Otherwise
+            // use the one from opts which defaults to the default set from the config package
+            if(this.env == "C"){
+                this.opts.standalone.coreAddress = process.env.CORE != undefined ? process.env.CORE : this.opts.standalone.coreAddress;
+                this.myAddress = process.env.ADDR != undefined ? process.env.ADDR : "";
+                log("using core address from env=" + this.opts.standalone.coreAddress + " with myAddress=" + this.myAddress);
+            } else {
+                log("core address=" + this.opts.standalone.coreAddress);
+            }
+        
+            // @important -- the only service allowed to be named CoreData is the actual gmbhCore
+            if(this.opts.service.name == "CoreData"){
+                reject("CoreData is a reserved service name")
+            }
+
+            resolve("");
         });
     }
 

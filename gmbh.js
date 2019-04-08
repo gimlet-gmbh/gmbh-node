@@ -57,6 +57,7 @@ var gmbh = /** @class */ (function () {
         this.registeredFunctions = {};
         // unused
         this.pongTime = "";
+        this.myAddress = "";
         // whoIs map [name]address
         //
         // if the name is not found in the map, a whois request will be sent to gmbhCore
@@ -102,7 +103,21 @@ var gmbh = /** @class */ (function () {
             else {
                 process.on('SIGINT', gmbh._shutdown);
             }
-            resolve(true);
+            // If the address back to core has been set using an environment variable, use that. Otherwise
+            // use the one from opts which defaults to the default set from the config package
+            if (_this.env == "C") {
+                _this.opts.standalone.coreAddress = process.env.CORE != undefined ? process.env.CORE : _this.opts.standalone.coreAddress;
+                _this.myAddress = process.env.ADDR != undefined ? process.env.ADDR : "";
+                log("using core address from env=" + _this.opts.standalone.coreAddress + " with myAddress=" + _this.myAddress);
+            }
+            else {
+                log("core address=" + _this.opts.standalone.coreAddress);
+            }
+            // @important -- the only service allowed to be named CoreData is the actual gmbhCore
+            if (_this.opts.service.name == "CoreData") {
+                reject("CoreData is a reserved service name");
+            }
+            resolve("");
         });
     };
     gmbh.prototype.Route = function (route, handler) {
