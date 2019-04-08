@@ -42,21 +42,43 @@ var grpc = require('grpc');
 var client;
 // @ts-ignore
 var name;
+var verbose;
+// gmbh holds that data needed to communicate with core and host 
+// a cabal server
 var gmbh = /** @class */ (function () {
     function gmbh(opts) {
+        // instructions from core
         this.reg = new registration();
+        // user configurable options
         this.opts = opts == undefined ? new options() : opts;
+        // rpc connection handler to gmbhCore over Cabal        
         this.con = new connection();
+        // map that handles function from the user's service
         this.registeredFunctions = {};
+        // unused
         this.pongTime = "";
+        // whoIs map [name]address
+        //
+        // if the name is not found in the map, a whois request will be sent to gmbhCore
+        // where it will be determined if the service can make the connection. The resulting
+        // address will be stored in this map
         this.whoIs = {};
         this.state = "DISCONNECTED";
         this.msgCnt = 0;
         this.errors = [""];
-        this.parentID = process.env.REMOTE != undefined ? process.env.REMOTE : "";
         this.warnings = [""];
+        // parentID is used only when running inside of a remote process manager and is set
+        // by the environment
+        this.parentID = process.env.REMOTE != undefined ? process.env.REMOTE : "";
+        // how to handle signals as set by the environment
+        // {M,C,""}
+        // M = managed; use sigusr
+        // C = containerized
+        // "" = standalone
         this.env = process.env.ENV != undefined ? process.env.ENV : "";
+        // closed is set true when shutdown procedures have been started
         this.closed = false;
+        // global reference to the client for ues by the rpc callbacks
         client = this;
     }
     gmbh.prototype.Start = function () {
@@ -69,6 +91,8 @@ var gmbh = /** @class */ (function () {
             log("version=" + version + "; env=" + _this.env);
             // @ts-ignore
             name = _this.opts.service.name;
+            // @ts-ignore
+            verbose = _this.opts.runtime.verbose;
             _this._connect();
             if (_this.env == "M") {
                 log("managed mode; ignoring sigint; listening for sigusr2");
@@ -259,7 +283,9 @@ var gmbh = /** @class */ (function () {
             log("refError");
             return;
         }
-        console.log(); // deadline to align output
+        if (verbose) {
+            console.log();
+        } // deadline to align output
         g.closed = true;
         g._unregister(g.opts.standalone.coreAddress, g.opts.service.name).then(function () {
             if (g != null) {
@@ -271,47 +297,72 @@ var gmbh = /** @class */ (function () {
     };
     return gmbh;
 }());
+// registration contains data that is received from core at registration time
 var registration = /** @class */ (function () {
     function registration() {
+        // id from core
         this.id = "";
+        // mode from core
         this.mode = "";
+        // address to run internal cabal server
         this.address = "";
+        // filesystem path back to core -- UNUSED
         this.corePath = "";
+        // a unique identifier from core to identify the client with core on request
         this.fingerprint = "";
     }
     return registration;
 }());
+// options contain some runtime configurable parameters
 var options = /** @class */ (function () {
     function options() {
+        // RuntimeOptions are options that affect runtime behavior
         this.runtime = new runtimeOptions();
+        // standalone options are those intended for use without the service launcher or remotes
         this.standalone = new standaloneOptions();
+        // service options are those that are used for identifying the service with core
         this.service = new serviceOptions();
     }
     return options;
 }());
 var runtimeOptions = /** @class */ (function () {
     function runtimeOptions() {
+        // Should the client block the main thread until shutdown signal is received?
         this.blocking = true;
+        // Should the client run in verbose mode. in Verbose mode, debug information regarding
+        // the gmbh client will be printed to stdOut
         this.verbose = true;
     }
     return runtimeOptions;
 }());
 var standaloneOptions = /** @class */ (function () {
     function standaloneOptions() {
+        // The address back to core
+        // NOTE: This will be overriden depending on environment
         this.coreAddress = COREADDRESS;
     }
     return standaloneOptions;
 }());
 var serviceOptions = /** @class */ (function () {
     function serviceOptions() {
+        // The unique name of the service as registered to core
         this.name = "";
+        // Like the name, must be unique across all services; act as shortcut names
         this.aliases = [""];
+        // The group_id defines services that are allowed to connect directly with each-
+        // other and bypass the core for faster communications.
+        //
+        // The id assignment is arbitrary as long as each intended one has the same id.
+        // NOTE: Any services where the group_id is undefined will be able to talk to
+        //       eachother freely.
         this.peerGroups = ["universal"];
     }
     return serviceOptions;
 }());
 var connection = /** @class */ (function () {
     function connection() {
+        // The address that this service should run it's cabal server on, as assigned
+        // by core or env
         this.address = "";
         this.server = new grpc.Server();
         this.connected = false;
@@ -386,6 +437,7 @@ var cabal = /** @class */ (function () {
         resp.setError("unknown.request");
         callback(null, resp);
     };
+    // Data requests are made to other services via this function
     cabal.Data = function (call, callback) {
         var g = getClient();
         if (g == null) {
@@ -412,6 +464,7 @@ var cabal = /** @class */ (function () {
         msg.setResponder(result);
         callback(null, msg);
     };
+    // Summary of this service to report to core for dashboard and cli usage
     cabal.Summary = function (call, callback) {
         log("-> Summary Request");
         var fp = call.metadata.get("fingerprint");
@@ -496,8 +549,9 @@ var request = /** @class */ (function () {
     request.Register = function () { };
     return request;
 }());
-// handleDataRequest attempts to resolve the registered function with the client to send the 
-// payload to for processing.
+// handleDataRequest processes the incoming data request by looking up the inteded method in the transport
+// and sending the payload to and from the user friendly object.
+// Returns the payload in protobuf form
 function handleDataRequest(tport, pload) {
     var g = getClient();
     if (g == null) {
@@ -510,20 +564,6 @@ function handleDataRequest(tport, pload) {
     var obj = g.registeredFunctions[tport.getMethod()](tport.getSender(), payload.fromProto(pload));
     var rpcPayload = obj.toProto();
     return rpcPayload;
-}
-// getClient
-// used to keep track of the global client data for use with the static cabal class
-function getClient() {
-    return client == undefined ? null : client;
-}
-// log messages in a standardized way
-function log(msg) {
-    var tag = name == undefined ? "gmbh" : name;
-    console.log("[" + timeStamp() + "] [" + tag + "] " + msg);
-}
-function timeStamp() {
-    var d = new Date();
-    return d.getFullYear() + "/" + d.getMonth() + "/" + d.getDay() + " " + d.getHours() + ":" + d.getMinutes();
 }
 var payload = /** @class */ (function () {
     function payload() {
@@ -610,6 +650,23 @@ var payload = /** @class */ (function () {
     };
     return payload;
 }());
+// getClient
+// used to keep track of the global client data for use with the static cabal class
+function getClient() {
+    return client == undefined ? null : client;
+}
+// log messages in a standardized way
+function log(msg) {
+    if (verbose) {
+        var tag = name == undefined ? "gmbh" : name;
+        console.log("[" + timeStamp() + "] [" + tag + "] " + msg);
+    }
+}
+// pprint for timestamp usage in log
+function timeStamp() {
+    var d = new Date();
+    return d.getFullYear() + "/" + d.getMonth() + "/" + d.getDay() + " " + d.getHours() + ":" + d.getMinutes();
+}
 module.exports = {
     gmbh: gmbh,
     options: options,

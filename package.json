@@ -1,9 +1,10 @@
 {
   "name": "gmbh",
-  "version": "0.10.2",
+  "version": "0.10.3",
   "description": "gmbh nodejs client",
   "main": "gmbh.js",
   "dependencies": {
+    "@types/node": "^11.13.0",
     "google-protobuf": "^3.7.1",
     "grpc": "^1.19.0"
   },
