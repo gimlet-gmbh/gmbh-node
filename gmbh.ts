@@ -259,7 +259,7 @@ class gmbh {
                 service.setIsserver(true); 
 
                 request.setService(service);
-                request.setAddress("");
+                request.setAddress(this.myAddress);
                 request.setEnv(this.env);
 
                 client.registerService(request, (err: object, resp: any) => {

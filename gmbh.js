@@ -257,7 +257,7 @@ var gmbh = /** @class */ (function () {
                 service.setIsclient(true);
                 service.setIsserver(true);
                 request.setService(service);
-                request.setAddress("");
+                request.setAddress(_this.myAddress);
                 request.setEnv(_this.env);
                 client.registerService(request, function (err, resp) {
                     if (err == null) {
