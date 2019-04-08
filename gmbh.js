@@ -672,7 +672,7 @@ function getClient() {
 }
 // log messages in a standardized way
 function log(msg) {
-    if (verbose) {
+    if (verbose || verbose == undefined) {
         var tag = name == undefined ? "gmbh" : name;
         console.log("[" + timeStamp() + "] [" + tag + "] " + msg);
     }

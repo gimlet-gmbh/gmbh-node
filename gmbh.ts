@@ -747,7 +747,7 @@ function getClient(): gmbh | null {
 
 // log messages in a standardized way
 function log(msg: any){
-    if(verbose){
+    if(verbose || verbose == undefined){
         let tag = name == undefined ? "gmbh" : name;
         console.log("["+ timeStamp() + "] ["+tag+"] " + msg);
     }
