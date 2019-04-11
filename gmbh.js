@@ -454,30 +454,41 @@ var cabal = /** @class */ (function () {
     };
     // Data requests are made to other services via this function
     cabal.Data = function (call, callback) {
-        var g = getClient();
-        if (g == null) {
-            var err = new messages.DataResponse();
-            err.setError("core.referr");
-            callback(null, err);
-            return;
-        }
-        g.msgCnt++;
-        var request = call.request.getRequest();
-        var tport = request.getTport();
-        log("==" + g.msgCnt + "==> from=" + tport.getSender() + "; method=" + tport.getMethod());
-        var value = handleDataRequest(tport, request.getPload());
-        if (value == null) {
-            log("issues");
-            var msg_1 = new messages.DataResponse();
-            msg_1.setError("handle.request.failed");
-            callback(null, msg_1);
-            return;
-        }
-        var result = new messages.Responder();
-        result.setPload(value);
-        var msg = new messages.DataResponse();
-        msg.setResponder(result);
-        callback(null, msg);
+        return __awaiter(this, void 0, void 0, function () {
+            var g, err, request, tport, value, msg_1, result, msg;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        g = getClient();
+                        if (g == null) {
+                            err = new messages.DataResponse();
+                            err.setError("core.referr");
+                            callback(null, err);
+                            return [2 /*return*/];
+                        }
+                        g.msgCnt++;
+                        request = call.request.getRequest();
+                        tport = request.getTport();
+                        log("==" + g.msgCnt + "==> from=" + tport.getSender() + "; method=" + tport.getMethod());
+                        return [4 /*yield*/, handleDataRequest(tport, request.getPload())];
+                    case 1:
+                        value = _a.sent();
+                        if (value == null) {
+                            log("issues");
+                            msg_1 = new messages.DataResponse();
+                            msg_1.setError("handle.request.failed");
+                            callback(null, msg_1);
+                            return [2 /*return*/];
+                        }
+                        result = new messages.Responder();
+                        result.setPload(value);
+                        msg = new messages.DataResponse();
+                        msg.setResponder(result);
+                        callback(null, msg);
+                        return [2 /*return*/];
+                }
+            });
+        });
     };
     // Summary of this service to report to core for dashboard and cli usage
     cabal.Summary = function (call, callback) {
@@ -568,17 +579,27 @@ var request = /** @class */ (function () {
 // and sending the payload to and from the user friendly object.
 // Returns the payload in protobuf form
 function handleDataRequest(tport, pload) {
-    var g = getClient();
-    if (g == null) {
-        return null;
-    }
-    if (g.registeredFunctions[tport.getMethod()] == undefined) {
-        log("undefined method");
-        return null;
-    }
-    var obj = g.registeredFunctions[tport.getMethod()](tport.getSender(), payload.fromProto(pload));
-    var rpcPayload = obj.toProto();
-    return rpcPayload;
+    return __awaiter(this, void 0, void 0, function () {
+        var g, obj, rpcPayload;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    g = getClient();
+                    if (g == null) {
+                        return [2 /*return*/, null];
+                    }
+                    if (g.registeredFunctions[tport.getMethod()] == undefined) {
+                        log("undefined method");
+                        return [2 /*return*/, null];
+                    }
+                    return [4 /*yield*/, g.registeredFunctions[tport.getMethod()](tport.getSender(), payload.fromProto(pload))];
+                case 1:
+                    obj = _a.sent();
+                    rpcPayload = obj.toProto();
+                    return [2 /*return*/, rpcPayload];
+            }
+        });
+    });
 }
 var payload = /** @class */ (function () {
     function payload() {

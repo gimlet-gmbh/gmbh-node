@@ -486,7 +486,7 @@ class cabal {
     }
 
     // Data requests are made to other services via this function
-    static Data(call: any, callback: Function){
+    static async Data(call: any, callback: Function){
 
         let g = getClient();
         if(g == null){
@@ -500,7 +500,7 @@ class cabal {
         let tport = request.getTport();
         log(`==${g.msgCnt}==> from=${tport.getSender()}; method=${tport.getMethod()}`)
 
-        let value = handleDataRequest(tport, request.getPload());
+        let value = await handleDataRequest(tport, request.getPload());
         if(value == null){
             log("issues");
             let msg = new messages.DataResponse();
@@ -618,7 +618,7 @@ class request {
 // handleDataRequest processes the incoming data request by looking up the inteded method in the transport
 // and sending the payload to and from the user friendly object.
 // Returns the payload in protobuf form
-function handleDataRequest(tport: any, pload: any): any{
+async function handleDataRequest(tport: any, pload: any) {
     let g = getClient();
     if(g == null){
         return null;
@@ -629,7 +629,7 @@ function handleDataRequest(tport: any, pload: any): any{
         return null;
     }
 
-    let obj =  g.registeredFunctions[tport.getMethod()](tport.getSender(), payload.fromProto(pload));
+    let obj =  await g.registeredFunctions[tport.getMethod()](tport.getSender(), payload.fromProto(pload));
     let rpcPayload = obj.toProto();
     return rpcPayload;
 }
