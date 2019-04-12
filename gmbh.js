@@ -85,6 +85,8 @@ var gmbh = /** @class */ (function () {
     gmbh.prototype.Start = function () {
         var _this = this;
         return new Promise(function (resolve, reject) {
+            // @ts-ignore
+            verbose = _this.opts.runtime.verbose;
             log("                    _                 ");
             log("  _  ._ _  |_  |_| /  | o  _  ._ _|_  ");
             log(" (_| | | | |_) | | \\_ | | (/_ | | |_ ");
@@ -92,8 +94,6 @@ var gmbh = /** @class */ (function () {
             log("version=" + version + "; env=" + _this.env);
             // @ts-ignore
             name = _this.opts.service.name;
-            // @ts-ignore
-            verbose = _this.opts.runtime.verbose;
             _this._connect();
             if (_this.env == "M") {
                 log("managed mode; ignoring sigint; listening for sigusr2");
@@ -681,7 +681,13 @@ var payload = /** @class */ (function () {
     };
     payload.prototype._setProto = function (field, func) {
         for (var elems in field) {
-            this.proto[func]().set(field[elems][0], field[elems][1]);
+            try {
+                this.proto[func]().set(field[elems][0], field[elems][1]);
+            }
+            catch (err) {
+                log("Probable type error : could not assign " + field[elems][0]);
+                log(err);
+            }
         }
     };
     return payload;

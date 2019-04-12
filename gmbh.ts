@@ -80,6 +80,9 @@ class gmbh {
     Start(): Promise<string>{
         return new Promise<string>((resolve, reject)=>{
 
+            // @ts-ignore
+            verbose = this.opts.runtime.verbose;
+
             log("                    _                 ")
             log("  _  ._ _  |_  |_| /  | o  _  ._ _|_  ")
             log(" (_| | | | |_) | | \\_ | | (/_ | | |_ ")
@@ -88,8 +91,7 @@ class gmbh {
     
             // @ts-ignore
             name = this.opts.service.name;
-            // @ts-ignore
-            verbose = this.opts.runtime.verbose;
+
             this._connect();
     
             if(this.env == "M"){
@@ -734,7 +736,12 @@ class payload{
 
     _setProto(field: any, func: any){
         for(let elems in field){
-            this.proto[func]().set(field[elems][0],field[elems][1]);
+            try {
+                this.proto[func]().set(field[elems][0],field[elems][1]);
+            } catch(err) {
+                log("Probable type error : could not assign " + field[elems][0]);
+                log(err);
+            }
         }
     }
 }
