@@ -6,6 +6,8 @@ var messages = require('./intrigue_pb');
 var services = require('./intrigue_grpc_pb');
 var grpc = require('grpc');
 
+// var atob = require("atob");
+
 var client: gmbh;
 
 // @ts-ignore
@@ -20,7 +22,6 @@ class gmbh {
     con: connection;
     registeredFunctions: any;
     messages: any;
-    pongTime: string
     myAddress: string
     whoIs: any;
     state: string;
@@ -42,9 +43,6 @@ class gmbh {
 
         // map that handles function from the user's service
         this.registeredFunctions = {};
-
-        // unused
-        this.pongTime = "";
         this.myAddress = "";
 
         // whoIs map [name]address
@@ -637,91 +635,38 @@ async function handleDataRequest(tport: any, pload: any) {
 }
 
 class payload{
-    fieldsMap: Array<Array<any>>;
     jsonMap: Array<Array<any>>;
-    textfieldsMap: Array<Array<any>>;
-    boolfieldsMap: Array<Array<any>>;
-    bytefieldsMap: Array<Array<any>>;
-    intfieldsMap: Array<Array<any>>;
-    int64fieldsMap: Array<Array<any>>;
-    uintfieldsMap: Array<Array<any>>;
-    uint64fieldsMap: Array<Array<any>>;
-    doublefieldsMap: Array<Array<any>>;
-    floatfieldsMap: Array<Array<any>>;
 
     proto: any;
     constructor(){
-        this.fieldsMap = []
         this.jsonMap = []
-        this.textfieldsMap = []
-        this.boolfieldsMap = []
-        this.bytefieldsMap = []
-        this.intfieldsMap = []
-        this.int64fieldsMap = []
-        this.uintfieldsMap = []
-        this.uint64fieldsMap = []
-        this.doublefieldsMap = []
-        this.floatfieldsMap = []
-
         this.proto = null;
     }
 
     static fromProto(pload: any): payload {
         let obj = pload.toObject();
         let r = new payload();
-        r.fieldsMap = obj['fieldsMap'];
         r.jsonMap = obj['jsonMap'];
-        r.textfieldsMap = obj['textfieldsMap'];
-        r.boolfieldsMap = obj['boolfieldsMap'];
-        r.bytefieldsMap = obj['bytefieldsMap'];
-        r.intfieldsMap = obj['intfieldsMap'];
-        r.int64fieldsMap = obj['int64fieldsMap'];
-        r.uintfieldsMap = obj['uintfieldsMap'];
-        r.uint64fieldsMap = obj['uint64fieldsMap'];
-        r.doublefieldsMap = obj['doublefieldsMap'];
-        r.floatfieldsMap = obj['floatfieldsMap'];
         return r;
     }
 
     toProto(): any {
         this.proto = new messages.Payload(); 
-        this._setProto(this.fieldsMap, this.proto.getFieldsMap);
-        this._setProto(this.jsonMap, this.proto.getJsonMap);
-        this._setProto(this.textfieldsMap, 'getTextfieldsMap');
-        this._setProto(this.boolfieldsMap, this.proto.getBoolfieldsMap);
-        this._setProto(this.bytefieldsMap, this.proto.getBytefieldsMap);
-        this._setProto(this.intfieldsMap, this.proto.getIntfieldsMap);
-        this._setProto(this.int64fieldsMap, this.proto.getInt64fieldsMap);
-        this._setProto(this.uintfieldsMap, this.proto.getUintfieldsMap);
-        this._setProto(this.uint64fieldsMap, this.proto.getUint64fieldsMap);
-        this._setProto(this.doublefieldsMap, this.proto.getDoublefieldsMap);
-        this._setProto(this.floatfieldsMap, this.proto.getFloatfieldsMap);
+        this._setProto(this.jsonMap, 'getJsonMap');
         return this.proto;
     }
 
-    appendFields(key:string, value: string)        { this.fieldsMap.push([key,value]);}
-    appendJson(key:string, value: JSON)            { this.jsonMap.push([key,value]); }
-    appendTextfields(key:string, value: string)    { this.textfieldsMap.push([key,value]); }
-    appendBoolfields(key:string, value: boolean)   { this.boolfieldsMap.push([key,value]); }
-    appendBytefields(key:string, value: any)       { this.bytefieldsMap.push([key,value]); }
-    appendIntfields(key:string, value: number)     { this.intfieldsMap.push([key,value]); }
-    appendInt64fields(key:string, value: number)   { this.int64fieldsMap.push([key,value]); }
-    appendUintfields(key:string, value: number)    { this.uintfieldsMap.push([key,value]); }
-    appendUint64fields(key:string, value: number)  { this.uint64fieldsMap.push([key,value]); }
-    appendDoublefields(key:string, value: number)  { this.doublefieldsMap.push([key,value]); }
-    appendFloatfields(key:string, value: number)   { this.floatfieldsMap.push([key,value]); }
+    append(key:string, value: JSON) { 
+        this.jsonMap.push([key,this._marshal(value)]); 
+    }
 
-    getFields(key:string)        { return this._lookupField('fieldsMap', key)}
-    getJson(key:string)          { return this._lookupField('jsonMap', key); }
-    getTextfields(key:string)    { return this._lookupField('textfieldsMap', key); }
-    getBoolfields(key:string)    { return this._lookupField('boolfieldsMap', key); }
-    getBytefields(key:string)    { return this._lookupField('bytefieldsMap', key); }
-    getIntfields(key:string)     { return this._lookupField('intfieldsMap', key); }
-    getInt64fields(key:string)   { return this._lookupField('int64fieldsMap', key); }
-    getUintfields(key:string)    { return this._lookupField('uintfieldsMap', key); }
-    getUint64fields(key:string)  { return this._lookupField('uint64fieldsMap', key); }
-    getDoublefields(key:string)  { return this._lookupField('doublefieldsMap', key); }
-    getFloatfields(key:string)   { return this._lookupField('floatfieldsMap', key); }
+    get(key:string) { 
+        let found = this._lookupField('jsonMap', key); 
+        if(found){
+            return this._unmarshall(found);
+        }
+        return "";
+    }
 
     _lookupField(field: any, key:any) {
         // @ts-ignore
@@ -743,6 +688,25 @@ class payload{
                 log(err);
             }
         }
+    }
+
+    // from Uint8Array
+    _unmarshall(data:any){
+        var str = "";
+        for (var i = 0; i < data.length; i++) {
+            str += String.fromCharCode(parseInt(data[i]));
+        }
+        return JSON.parse(atob(str));
+    }
+
+    // to Uint8Array
+    _marshal(json:any) {
+        var str = JSON.stringify(json, null, 0);
+        var ret = new Uint8Array(str.length);
+        for (var i = 0; i < str.length; i++) {
+            ret[i] = str.charCodeAt(i);
+        }
+        return ret
     }
 }
 

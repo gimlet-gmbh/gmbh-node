@@ -39,6 +39,7 @@ var COREADDRESS = "localhost:49500";
 var messages = require('./intrigue_pb');
 var services = require('./intrigue_grpc_pb');
 var grpc = require('grpc');
+// var atob = require("atob");
 var client;
 // @ts-ignore
 var name;
@@ -55,8 +56,6 @@ var gmbh = /** @class */ (function () {
         this.con = new connection();
         // map that handles function from the user's service
         this.registeredFunctions = {};
-        // unused
-        this.pongTime = "";
         this.myAddress = "";
         // whoIs map [name]address
         //
@@ -603,72 +602,30 @@ function handleDataRequest(tport, pload) {
 }
 var payload = /** @class */ (function () {
     function payload() {
-        this.fieldsMap = [];
         this.jsonMap = [];
-        this.textfieldsMap = [];
-        this.boolfieldsMap = [];
-        this.bytefieldsMap = [];
-        this.intfieldsMap = [];
-        this.int64fieldsMap = [];
-        this.uintfieldsMap = [];
-        this.uint64fieldsMap = [];
-        this.doublefieldsMap = [];
-        this.floatfieldsMap = [];
         this.proto = null;
     }
     payload.fromProto = function (pload) {
         var obj = pload.toObject();
         var r = new payload();
-        r.fieldsMap = obj['fieldsMap'];
         r.jsonMap = obj['jsonMap'];
-        r.textfieldsMap = obj['textfieldsMap'];
-        r.boolfieldsMap = obj['boolfieldsMap'];
-        r.bytefieldsMap = obj['bytefieldsMap'];
-        r.intfieldsMap = obj['intfieldsMap'];
-        r.int64fieldsMap = obj['int64fieldsMap'];
-        r.uintfieldsMap = obj['uintfieldsMap'];
-        r.uint64fieldsMap = obj['uint64fieldsMap'];
-        r.doublefieldsMap = obj['doublefieldsMap'];
-        r.floatfieldsMap = obj['floatfieldsMap'];
         return r;
     };
     payload.prototype.toProto = function () {
         this.proto = new messages.Payload();
-        this._setProto(this.fieldsMap, this.proto.getFieldsMap);
-        this._setProto(this.jsonMap, this.proto.getJsonMap);
-        this._setProto(this.textfieldsMap, 'getTextfieldsMap');
-        this._setProto(this.boolfieldsMap, this.proto.getBoolfieldsMap);
-        this._setProto(this.bytefieldsMap, this.proto.getBytefieldsMap);
-        this._setProto(this.intfieldsMap, this.proto.getIntfieldsMap);
-        this._setProto(this.int64fieldsMap, this.proto.getInt64fieldsMap);
-        this._setProto(this.uintfieldsMap, this.proto.getUintfieldsMap);
-        this._setProto(this.uint64fieldsMap, this.proto.getUint64fieldsMap);
-        this._setProto(this.doublefieldsMap, this.proto.getDoublefieldsMap);
-        this._setProto(this.floatfieldsMap, this.proto.getFloatfieldsMap);
+        this._setProto(this.jsonMap, 'getJsonMap');
         return this.proto;
     };
-    payload.prototype.appendFields = function (key, value) { this.fieldsMap.push([key, value]); };
-    payload.prototype.appendJson = function (key, value) { this.jsonMap.push([key, value]); };
-    payload.prototype.appendTextfields = function (key, value) { this.textfieldsMap.push([key, value]); };
-    payload.prototype.appendBoolfields = function (key, value) { this.boolfieldsMap.push([key, value]); };
-    payload.prototype.appendBytefields = function (key, value) { this.bytefieldsMap.push([key, value]); };
-    payload.prototype.appendIntfields = function (key, value) { this.intfieldsMap.push([key, value]); };
-    payload.prototype.appendInt64fields = function (key, value) { this.int64fieldsMap.push([key, value]); };
-    payload.prototype.appendUintfields = function (key, value) { this.uintfieldsMap.push([key, value]); };
-    payload.prototype.appendUint64fields = function (key, value) { this.uint64fieldsMap.push([key, value]); };
-    payload.prototype.appendDoublefields = function (key, value) { this.doublefieldsMap.push([key, value]); };
-    payload.prototype.appendFloatfields = function (key, value) { this.floatfieldsMap.push([key, value]); };
-    payload.prototype.getFields = function (key) { return this._lookupField('fieldsMap', key); };
-    payload.prototype.getJson = function (key) { return this._lookupField('jsonMap', key); };
-    payload.prototype.getTextfields = function (key) { return this._lookupField('textfieldsMap', key); };
-    payload.prototype.getBoolfields = function (key) { return this._lookupField('boolfieldsMap', key); };
-    payload.prototype.getBytefields = function (key) { return this._lookupField('bytefieldsMap', key); };
-    payload.prototype.getIntfields = function (key) { return this._lookupField('intfieldsMap', key); };
-    payload.prototype.getInt64fields = function (key) { return this._lookupField('int64fieldsMap', key); };
-    payload.prototype.getUintfields = function (key) { return this._lookupField('uintfieldsMap', key); };
-    payload.prototype.getUint64fields = function (key) { return this._lookupField('uint64fieldsMap', key); };
-    payload.prototype.getDoublefields = function (key) { return this._lookupField('doublefieldsMap', key); };
-    payload.prototype.getFloatfields = function (key) { return this._lookupField('floatfieldsMap', key); };
+    payload.prototype.append = function (key, value) {
+        this.jsonMap.push([key, this._marshal(value)]);
+    };
+    payload.prototype.get = function (key) {
+        var found = this._lookupField('jsonMap', key);
+        if (found) {
+            return this._unmarshall(found);
+        }
+        return "";
+    };
     payload.prototype._lookupField = function (field, key) {
         // @ts-ignore
         for (var elem in this[field]) {
@@ -689,6 +646,23 @@ var payload = /** @class */ (function () {
                 log(err);
             }
         }
+    };
+    // from Uint8Array
+    payload.prototype._unmarshall = function (data) {
+        var str = "";
+        for (var i = 0; i < data.length; i++) {
+            str += String.fromCharCode(parseInt(data[i]));
+        }
+        return JSON.parse(atob(str));
+    };
+    // to Uint8Array
+    payload.prototype._marshal = function (json) {
+        var str = JSON.stringify(json, null, 0);
+        var ret = new Uint8Array(str.length);
+        for (var i = 0; i < str.length; i++) {
+            ret[i] = str.charCodeAt(i);
+        }
+        return ret;
     };
     return payload;
 }());

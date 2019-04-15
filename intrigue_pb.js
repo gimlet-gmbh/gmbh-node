@@ -11,6 +11,8 @@ var jspb = require('google-protobuf');
 var goog = jspb;
 var global = Function('return this')();
 
+var google_protobuf_any_pb = require('google-protobuf/google/protobuf/any_pb.js');
+goog.object.extend(proto, google_protobuf_any_pb);
 goog.exportSymbol('proto.intrigue.Action', null, global);
 goog.exportSymbol('proto.intrigue.CoreService', null, global);
 goog.exportSymbol('proto.intrigue.DataRequest', null, global);
@@ -5004,7 +5006,8 @@ proto.intrigue.Payload.toObject = function(includeInstance, msg) {
     uintfieldsMap: (f = msg.getUintfieldsMap()) ? f.toObject(includeInstance, undefined) : [],
     uint64fieldsMap: (f = msg.getUint64fieldsMap()) ? f.toObject(includeInstance, undefined) : [],
     doublefieldsMap: (f = msg.getDoublefieldsMap()) ? f.toObject(includeInstance, undefined) : [],
-    floatfieldsMap: (f = msg.getFloatfieldsMap()) ? f.toObject(includeInstance, undefined) : []
+    floatfieldsMap: (f = msg.getFloatfieldsMap()) ? f.toObject(includeInstance, undefined) : [],
+    dataMap: (f = msg.getDataMap()) ? f.toObject(includeInstance, proto.google.protobuf.Any.toObject) : []
   };
 
   if (includeInstance) {
@@ -5107,6 +5110,12 @@ proto.intrigue.Payload.deserializeBinaryFromReader = function(msg, reader) {
         jspb.Map.deserializeBinary(message, reader, jspb.BinaryReader.prototype.readString, jspb.BinaryReader.prototype.readFloat, null, "");
          });
       break;
+    case 80:
+      var value = msg.getDataMap();
+      reader.readMessage(value, function(message, reader) {
+        jspb.Map.deserializeBinary(message, reader, jspb.BinaryReader.prototype.readString, jspb.BinaryReader.prototype.readMessage, proto.google.protobuf.Any.deserializeBinaryFromReader, "");
+         });
+      break;
     default:
       reader.skipField();
       break;
@@ -5179,6 +5188,10 @@ proto.intrigue.Payload.serializeBinaryToWriter = function(message, writer) {
   f = message.getFloatfieldsMap(true);
   if (f && f.getLength() > 0) {
     f.serializeBinary(76, writer, jspb.BinaryWriter.prototype.writeString, jspb.BinaryWriter.prototype.writeFloat);
+  }
+  f = message.getDataMap(true);
+  if (f && f.getLength() > 0) {
+    f.serializeBinary(80, writer, jspb.BinaryWriter.prototype.writeString, jspb.BinaryWriter.prototype.writeMessage, proto.google.protobuf.Any.serializeBinaryToWriter);
   }
 };
 
@@ -5378,6 +5391,24 @@ proto.intrigue.Payload.prototype.getFloatfieldsMap = function(opt_noLazyCreate) 
 
 proto.intrigue.Payload.prototype.clearFloatfieldsMap = function() {
   this.getFloatfieldsMap().clear();
+};
+
+
+/**
+ * map<string, google.protobuf.Any> Data = 80;
+ * @param {boolean=} opt_noLazyCreate Do not create the map if
+ * empty, instead returning `undefined`
+ * @return {!jspb.Map<string,!proto.google.protobuf.Any>}
+ */
+proto.intrigue.Payload.prototype.getDataMap = function(opt_noLazyCreate) {
+  return /** @type {!jspb.Map<string,!proto.google.protobuf.Any>} */ (
+      jspb.Message.getMapField(this, 80, opt_noLazyCreate,
+      proto.google.protobuf.Any));
+};
+
+
+proto.intrigue.Payload.prototype.clearDataMap = function() {
+  this.getDataMap().clear();
 };
 
 

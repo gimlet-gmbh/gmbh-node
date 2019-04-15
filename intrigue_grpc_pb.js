@@ -3,6 +3,7 @@
 'use strict';
 var grpc = require('grpc');
 var intrigue_intrigue_pb = require('./intrigue_pb.js');
+var google_protobuf_any_pb = require('google-protobuf/google/protobuf/any_pb.js');
 
 function serialize_intrigue_Action(arg) {
   if (!(arg instanceof intrigue_intrigue_pb.Action)) {
