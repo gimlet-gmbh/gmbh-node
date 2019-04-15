@@ -39,7 +39,8 @@ var COREADDRESS = "localhost:49500";
 var messages = require('./intrigue_pb');
 var services = require('./intrigue_grpc_pb');
 var grpc = require('grpc');
-// var atob = require("atob");
+//@ts-ignore
+var atob = require('atob');
 var client;
 // @ts-ignore
 var name;
